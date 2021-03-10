@@ -1,0 +1,84 @@
+import pandas as pd
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split
+from collections import Counter
+from sklearn.compose import ColumnTransformer
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, InputLayer
+from sklearn.metrics import classification_report
+from tensorflow.keras.utils import to_categorical
+import numpy as np
+import tensorflow
+
+# Load data from csv dataset 
+data = pd.read_csv('heart_failure.csv')
+
+# Checking info of all columns
+print(data.info())
+# Print the distribution of death_event column  using Counter
+print(Counter(data['death_event']))
+
+# Extract the column death event as a prediction column
+y = data['death_event']
+
+# Extract other columns for training data
+x = data[['age','anaemia','creatinine_phosphokinase','diabetes','ejection_fraction','high_blood_pressure','platelets','serum_creatinine','serum_sodium','sex','smoking','time']]
+
+# Convert the categorical features in x to one hot encoding vectors
+x = pd.get_dummies(x)
+
+# Split the data into training features , test features, training labels, test labels
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.25, random_state=0)
+
+# Initilize ColumnTransformer by using StandardScaler to scale numeric features
+ct = StandardScaler([('numeric', StandardScaler(), ['age','creatinine_phosphokinase','ejection_fraction','platelets','serum_creatinine','serum_sodium','time'])])
+
+# Scale the dataset
+X_train = ct.fit_transform(X_train)
+X_test = ct.transform(X_test)
+
+# Initialize LabelEncoder
+le = LabelEncoder()
+# Transform y_train
+y_train = le.fit_transform(y_train.astype(str))
+# Transform y_test
+y_test = le.transform(y_test.astype(str))
+
+# Transform to_categorical into binary vector
+y_train = tensorflow.keras.utils.to_categorical(y_train, dtype='int64')
+y_test = tensorflow.keras.utils.to_categorical(y_test, dtype='int64')
+
+# Create model
+model = Sequential()
+
+# Add input layer
+model.add(InputLayer(input_shape=(X_train.shape[1],)))
+
+# Add Dense layer
+model.add(Dense(12, activation='relu'))
+# Add last layer of output
+model.add(Dense(2, activation='softmax'))
+
+# Compile the model
+model.compile(loss='categorical_crossentropy',
+optimizer='adam', metrics=['accuracy'])
+
+# Train and fit model
+model.fit(X_train, y_train, epochs=100, batch_size=16)
+
+# Evaluate our trained model
+loss, acc = model.evaluate(X_test, y_test, verbose=0)
+print(loss, acc)
+
+# Generating a classification report
+
+# Predict 
+y_estimate = model.predict(X_test)
+
+# Revert back to true classes of each labels by using argmax function from numpy
+y_estimate = np.argmax(y_estimate, axis=1)
+
+y_true = np.argmax(y_test, axis=1)
+
+# Check classification report
+print(classification_report(y_true, y_estimate))
